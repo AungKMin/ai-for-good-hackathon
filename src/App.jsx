@@ -313,27 +313,73 @@ function ConversationScreen({ sectorIdx, levelIdx, onComplete, onBack }) {
   const [showText,     setShowText]     = useState(false)
   const [textInput,    setTextInput]    = useState('')
 
-  const recRef = useRef(null)
+  const recRef     = useRef(null)
+  const timeoutRef = useRef(null)
+  const gotResult  = useRef(false)
+
+  // Bug 3 fix: detect iOS — SpeechRecognition not supported there
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
 
   useEffect(() => {
     speak(level.opening, {
       rate: level.character.rate, pitch: level.character.pitch,
       onEnd: () => setPhase('ready_to_speak'),
     })
-    return () => { stopSpeech(); try { recRef.current?.stop() } catch (_) {} }
+    return () => {
+      stopSpeech()
+      clearTimeout(timeoutRef.current)
+      try { recRef.current?.stop() } catch (_) {}
+    }
   }, [])
 
   const startRecording = useCallback(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
-    if (!SR) { setShowText(true); return }
+    // Bug 3 fix: iOS has no SpeechRecognition — go straight to text
+    if (!SR || isIOS) { setShowText(true); return }
+
+    gotResult.current = false
     const r = new SR()
     r.continuous = false; r.interimResults = false; r.lang = 'en-US'
-    r.onresult = e => handlePlayerSpeech(e.results[0][0].transcript)
-    r.onerror  = () => setShowText(true)
-    recRef.current = r; r.start(); setPhase('recording')
-  }, [])
 
-  const stopRecording = useCallback(() => { try { recRef.current?.stop() } catch (_) {} }, [])
+    r.onresult = e => {
+      gotResult.current = true
+      clearTimeout(timeoutRef.current)
+      handlePlayerSpeech(e.results[0][0].transcript)
+    }
+
+    // Bug 2 fix: if onend fires without a result, user stayed silent → show text fallback
+    r.onend = () => {
+      clearTimeout(timeoutRef.current)
+      if (!gotResult.current) setShowText(true)
+    }
+
+    r.onerror = () => {
+      clearTimeout(timeoutRef.current)
+      setShowText(true)
+    }
+
+    recRef.current = r
+    r.start()
+    setPhase('recording')
+
+    // Bug 2 fix: 10s hard timeout in case onend never fires
+    timeoutRef.current = setTimeout(() => {
+      if (!gotResult.current) {
+        try { recRef.current?.stop() } catch (_) {}
+        setShowText(true)
+      }
+    }, 10000)
+  }, [isIOS])
+
+  // Bug 1 fix: removed stopRecording from onMouseUp/onTouchEnd — mic is tap-to-toggle only
+  const toggleRecording = useCallback(() => {
+    if (phase === 'recording') {
+      clearTimeout(timeoutRef.current)
+      try { recRef.current?.stop() } catch (_) {}
+    } else {
+      startRecording()
+    }
+  }, [phase, startRecording])
 
   const handlePlayerSpeech = async (speech) => {
     setPlayerSpeech(speech); setPhase('processing')
@@ -539,12 +585,10 @@ Reply ONE warm sentence, max 12 words. Very simple English.`
               </div>
               <div style={{ fontSize: 36, letterSpacing: 10 }}>{level.hint}</div>
 
-              {/* Mic */}
+              {/* Mic — tap once to start, tap again to stop */}
               <button
                 className={isRecording ? 'animate-mic-glow' : ''}
-                onMouseDown={startRecording} onTouchStart={startRecording}
-                onMouseUp={stopRecording}   onTouchEnd={stopRecording}
-                onClick={isRecording ? stopRecording : startRecording}
+                onClick={toggleRecording}
                 style={{
                   width: 100, height: 100, borderRadius: '50%',
                   background: isRecording ? '#FF4B4B' : '#58CC02',
