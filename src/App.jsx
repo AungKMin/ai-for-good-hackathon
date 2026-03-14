@@ -1,5 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 
+import imgCleanRoom    from './assets/clean_room.jpg.webp'
+import imgGarbage      from './assets/take_garbage_out.webp'
+import imgComplaint    from './assets/hotel_user_complaint.jpg'
+
 const API_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY
 
 /* ─────────────────────────────────────────────────────────────────
@@ -19,9 +23,9 @@ const SECTORS = [
     id: 'clean', emoji: '🧹', label: 'Cleaning',
     color: '#58CC02', dark: '#46A302', light: '#EEFFD6',
     levels: [
-      { name: 'Morning Rounds', character: { name: 'Rita', role: 'Supervisor', emoji: '👩‍💼', rate: 0.82, pitch: 1.0 }, opening: 'Good morning. Please clean rooms 101 to 110 first. Start with the bathrooms.', targetPhrase: 'OK. I will start with the bathrooms.', hint: '🚿  1️⃣', description: 'Supervisor assigns your rooms' },
-      { name: 'Out of Supplies', character: { name: 'Tom', role: 'Coworker', emoji: '🧑', rate: 0.85, pitch: 1.0 }, opening: 'Hey, do you have extra garbage bags? I ran out.', targetPhrase: 'Yes. Here you go. No problem.', hint: '🛍️  🤝', description: 'Coworker asks you for supplies' },
-      { name: 'Guest Complaint', character: { name: 'Rita', role: 'Supervisor', emoji: '👩‍💼', rate: 0.82, pitch: 1.0 }, opening: 'A guest said room 204 was not clean. Can you go back and check it please?', targetPhrase: 'Sorry. I will go back and fix it now.', hint: '😔  🔁', description: 'Supervisor asks you to redo a room' },
+      { name: 'Morning Rounds', image: imgCleanRoom,  character: { name: 'Rita', role: 'Supervisor', emoji: '👩‍💼', rate: 0.82, pitch: 1.0 }, opening: 'Good morning. Please clean rooms 101 to 110 first. Start with the bathrooms.', targetPhrase: 'OK. I will start with the bathrooms.', hint: '🚿  1️⃣', description: 'Supervisor assigns your rooms' },
+      { name: 'Out of Supplies', image: imgGarbage,   character: { name: 'Tom', role: 'Coworker', emoji: '🧑', rate: 0.85, pitch: 1.0 }, opening: 'Hey, do you have extra garbage bags? I ran out.', targetPhrase: 'Yes. Here you go. No problem.', hint: '🛍️  🤝', description: 'Coworker asks you for supplies' },
+      { name: 'Guest Complaint', image: imgComplaint, character: { name: 'Rita', role: 'Supervisor', emoji: '👩‍💼', rate: 0.82, pitch: 1.0 }, opening: 'A guest said room 204 was not clean. Can you go back and check it please?', targetPhrase: 'Sorry. I will go back and fix it now.', hint: '😔  🔁', description: 'Supervisor asks you to redo a room' },
     ],
   },
   {
@@ -266,16 +270,23 @@ function LevelSelectScreen({ sectorIdx, completedLevels, onSelect, onBack }) {
               onTouchStart={e => e.currentTarget.style.transform = 'scale(0.98)'}
               onTouchEnd={e => e.currentTarget.style.transform = 'scale(1)'}
             >
-              {/* Level badge */}
+              {/* Level badge — photo if available, else numbered circle */}
               <div style={{
-                width: 56, height: 56, borderRadius: '50%', flexShrink: 0,
+                width: 64, height: 64, borderRadius: 14, flexShrink: 0,
+                overflow: 'hidden', position: 'relative',
                 background: done ? sector.color : '#E5E5E5',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: done ? 26 : 22, fontWeight: 900,
-                color: done ? 'white' : '#999',
+                border: `3px solid ${done ? sector.color : '#DDD'}`,
                 boxShadow: done ? `0 4px 12px ${sector.color}66` : 'none',
               }}>
-                {done ? '⭐' : i + 1}
+                {level.image
+                  ? <img src={level.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', filter: done ? 'none' : 'grayscale(0.3)' }} />
+                  : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: done ? 26 : 22, fontWeight: 900, color: done ? 'white' : '#999' }}>
+                      {done ? '⭐' : i + 1}
+                    </div>
+                }
+                {done && (
+                  <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 }}>⭐</div>
+                )}
               </div>
 
               <div style={{ flex: 1 }}>
@@ -442,28 +453,44 @@ Reply ONE warm sentence, max 12 words. Very simple English.`
       {/* ── IDLE: "meet your character" tap screen ── */}
       {isIdle && (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', gap: 22 }}>
-          {/* Big avatar */}
-          <div style={{
-            width: 130, height: 130, borderRadius: '50%',
-            background: sector.light, border: `5px solid ${sector.color}`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 64, boxShadow: `0 8px 32px ${sector.color}44`,
-          }}>
-            {level.character.emoji}
+
+          {/* Scene image (if available) or big avatar */}
+          {level.image ? (
+            <div style={{ width: '100%', maxWidth: 360, height: 200, borderRadius: 24, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}>
+              <img src={level.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            </div>
+          ) : (
+            <div style={{
+              width: 130, height: 130, borderRadius: '50%',
+              background: sector.light, border: `5px solid ${sector.color}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 64, boxShadow: `0 8px 32px ${sector.color}44`,
+            }}>
+              {level.character.emoji}
+            </div>
+          )}
+
+          {/* Character avatar + name badge */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 52, height: 52, borderRadius: '50%',
+              background: sector.light, border: `3px solid ${sector.color}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26,
+            }}>
+              {level.character.emoji}
+            </div>
+            <div style={{ background: sector.color, color: 'white', borderRadius: 14, padding: '8px 18px', fontSize: 15, fontWeight: 800 }}>
+              {level.character.name} · {level.character.role}
+            </div>
           </div>
 
-          {/* Name + role badge */}
-          <div style={{ background: sector.color, color: 'white', borderRadius: 14, padding: '8px 22px', fontSize: 16, fontWeight: 800 }}>
-            {level.character.name} · {level.character.role}
-          </div>
-
-          {/* Giant ear / listen button */}
+          {/* Giant listen button */}
           <button
             onClick={handleListenTap}
             style={{
-              width: 130, height: 130, borderRadius: '50%',
+              width: 120, height: 120, borderRadius: '50%',
               background: sector.color, border: `5px solid ${sector.dark}`,
-              color: 'white', fontSize: 60,
+              color: 'white', fontSize: 54,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', minHeight: 'unset', minWidth: 'unset',
               boxShadow: `0 10px 36px ${sector.color}66`,
@@ -475,7 +502,6 @@ Reply ONE warm sentence, max 12 words. Very simple English.`
           >
             👂
           </button>
-          {/* Purely visual "tap" cue */}
           <div style={{ fontSize: 28 }}>👆</div>
         </div>
       )}
