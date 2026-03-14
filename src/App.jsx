@@ -378,9 +378,37 @@ function LevelSelectScreen({ sectorIdx, completedLevels, onSelect, onBack }) {
 
 /* ─────────────────────────────────────────────────────────────────
    CONVERSATION SCREEN
-───────────────────────────────────────────────────────────────── */
+─────────────────────────────────────────────────────────────────── */
 const WAVE_H = [18, 30, 44, 32, 20]
 const WAVE_D = ['0s', '0.12s', '0.24s', '0.36s', '0.48s']
+
+function SceneHeader({ level, sector, isIdle, onBack }) {
+  return (
+    <div style={{ position: 'relative', height: isIdle ? 200 : 150, flexShrink: 0, overflow: 'hidden' }}>
+      {level.image
+        ? <img src={level.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        : (
+          <div style={{
+            width: '100%', height: '100%',
+            background: sector.gradient,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <span style={{ fontSize: 90, filter: 'drop-shadow(0 4px 16px rgba(0,0,0,0.3))' }}>{sector.emoji}</span>
+          </div>
+        )
+      }
+      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.6) 100%)' }} />
+      <button
+        onClick={onBack}
+        style={{ position: 'absolute', top: 16, left: 16, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(8px)', border: 'none', borderRadius: 12, width: 40, height: 40, color: 'white', fontSize: 18, cursor: 'pointer', minHeight: 'unset', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      >←</button>
+      <div style={{ position: 'absolute', bottom: 14, left: 18, right: 18 }}>
+        <div style={{ color: 'white', fontSize: 19, fontWeight: 900, letterSpacing: -0.3 }}>{level.name}</div>
+        <div style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, marginTop: 2 }}>{sector.emoji} {sector.label}</div>
+      </div>
+    </div>
+  )
+}
 
 function ConversationScreen({ sectorIdx, levelIdx, onComplete, onBack }) {
   const sector   = SECTORS[sectorIdx]
@@ -394,6 +422,7 @@ function ConversationScreen({ sectorIdx, levelIdx, onComplete, onBack }) {
   const [stars,        setStars]        = useState(0)
   const [showText,     setShowText]     = useState(false)
   const [textInput,    setTextInput]    = useState('')
+  const [retryMsg,     setRetryMsg]     = useState('')
 
   const recRef     = useRef(null)
   const timeoutRef = useRef(null)
@@ -414,6 +443,14 @@ function ConversationScreen({ sectorIdx, levelIdx, onComplete, onBack }) {
       rate: level.character.rate, pitch: level.character.pitch,
       onEnd: () => setPhase('ready_to_speak'),
     })
+  }
+
+  const resetToSpeak = () => {
+    setPhase('ready_to_speak')
+    setPlayerSpeech('')
+    setRetryMsg('')
+    setTextInput('')
+    setShowText(false)
   }
 
   const toggleRecording = useCallback(() => {
@@ -442,13 +479,19 @@ Scenario: ${level.description}
 ${level.character.name} (${level.character.role}) said: "${level.opening}"
 Target response: "${level.targetPhrase}"
 Learner said: "${speech}"
+
+IMPORTANT RULES:
+- If the learner said something completely unrelated, nonsensical, offensive, or not an attempt at the scenario (e.g. random words, rude words, off-topic phrases): set star_count to 0 and set encouragement to a VERY SHORT gentle nudge in simple words like "Let's try again! Listen first." or "Almost! Try to answer ${level.character.name}."
+- If they genuinely tried but wrong: star_count 1
+- If understandable: star_count 2
+- If great: star_count 3
+
 Reply ONLY with valid JSON, no markdown:
-{"encouragement":"One warm sentence max 9 words","better_phrase":"Ideal simple English max 12 words","bengali_translation":"Bengali script translation","star_count":2}
-star_count: 3=great, 2=understandable, 1=tried but wrong`
+{"encouragement":"One warm sentence max 10 words","better_phrase":"Ideal simple English max 12 words","bengali_translation":"Bengali script translation","star_count":2}`
 
     const charSystem = `You are ${level.character.name}, ${level.character.role} at a Canadian ${sector.label.toLowerCase()} workplace. Talking to a new worker learning English.
 Your line: "${level.opening}" — They said: "${speech}"
-Reply ONE warm sentence, max 12 words. Very simple English.`
+Reply ONE warm sentence, max 12 words. Very simple English. If their reply was off-topic, gently redirect them.`
 
     try {
       const [coachRes, charRes] = await Promise.all([
@@ -460,18 +503,31 @@ Reply ONE warm sentence, max 12 words. Very simple English.`
         const raw = coachRes.content[0].text.trim().replace(/^```json\s*/i,'').replace(/^```\s*/i,'').replace(/```\s*$/g,'').trim()
         coachObj = JSON.parse(raw)
       } catch { coachObj = fallback }
+
+      const sc = Number(coachObj.star_count ?? 2)
+
+      if (sc === 0) {
+        const msg = coachObj.encouragement || "Let's try again! Listen carefully."
+        setRetryMsg(msg)
+        setPhase('retry')
+        speak(msg, { rate: 0.82 })
+        return
+      }
+
       const charText = charRes.content?.[0]?.text?.trim() || 'Good. Keep going.'
-      setCharResponse(charText); setCoaching(coachObj)
-      setStars(Math.min(3, Math.max(1, coachObj.star_count ?? 2))); setPhase('coaching')
+      setCharResponse(charText)
+      setCoaching(coachObj)
+      setStars(Math.min(3, Math.max(1, sc)))
+      setPhase('coaching')
       speak(coachObj.encouragement || '', { rate: 0.88, onEnd: () =>
-        speak(coachObj.better_phrase || '', { rate: 0.78, onEnd: () =>
+        speak(coachObj.better_phrase || '', { rate: 0.75, onEnd: () =>
           speak(coachObj.bengali_translation || '', { rate: 0.8, lang: 'bn-BD' })
         })
       })
     } catch {
       setCharResponse('Good. Keep going.'); setCoaching(fallback); setStars(fallback.star_count); setPhase('coaching')
       speak(fallback.encouragement, { rate: 0.88, onEnd: () =>
-        speak(fallback.better_phrase, { rate: 0.78, onEnd: () =>
+        speak(fallback.better_phrase, { rate: 0.75, onEnd: () =>
           speak(fallback.bengali_translation, { rate: 0.8, lang: 'bn-BD' })
         })
       })
@@ -484,37 +540,16 @@ Reply ONE warm sentence, max 12 words. Very simple English.`
   const isRecording    = phase === 'recording'
   const isProcessing   = phase === 'processing'
   const isCoaching     = phase === 'coaching'
-  const isReplay       = phase === 'coaching_replay'
-  const showCoach      = isCoaching || isReplay
+  const isRetry        = phase === 'retry'
   const showMic        = (isReadyToSpeak || isRecording) && !showText
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F0F4F8', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', background: '#F0F4F8', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
 
-      {/* ── Scene image header (always shown) ── */}
-      <div style={{ position: 'relative', height: isIdle ? 220 : 160, flexShrink: 0, overflow: 'hidden' }}>
-        {level.image
-          ? <img src={level.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          : <div style={{ width: '100%', height: '100%', background: sector.gradient, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 80 }}>{sector.emoji}</div>
-        }
-        {/* Gradient overlay */}
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.55) 100%)' }} />
-
-        {/* Back button */}
-        <button
-          onClick={onBack}
-          style={{ position: 'absolute', top: 16, left: 16, background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(8px)', border: 'none', borderRadius: 12, width: 40, height: 40, color: 'white', fontSize: 18, cursor: 'pointer', minHeight: 'unset', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-        >←</button>
-
-        {/* Level title overlay */}
-        <div style={{ position: 'absolute', bottom: 16, left: 18, right: 18 }}>
-          <div style={{ color: 'white', fontSize: 20, fontWeight: 900, letterSpacing: -0.3 }}>{level.name}</div>
-          <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: 13, marginTop: 2 }}>{sector.emoji} {sector.label}</div>
-        </div>
-      </div>
+      <SceneHeader level={level} sector={sector} isIdle={isIdle} onBack={onBack} />
 
       {/* ── Character avatar — overlaps scene image ── */}
-      <div style={{ display: 'flex', justifyContent: 'center', marginTop: -36, zIndex: 10, position: 'relative' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', marginTop: -38, zIndex: 10, position: 'relative', flexShrink: 0 }}>
         <div style={{ position: 'relative' }}>
           {isCharSpeaking && [0, 1].map(ri => (
             <div key={ri} style={{
@@ -525,56 +560,61 @@ Reply ONE warm sentence, max 12 words. Very simple English.`
           ))}
           <div style={{
             width: 76, height: 76, borderRadius: '50%',
-            background: 'white',
+            background: `linear-gradient(135deg, ${sector.light}, white)`,
             border: `4px solid white`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 36, boxShadow: '0 6px 24px rgba(0,0,0,0.2)',
+            fontSize: 38, boxShadow: '0 6px 24px rgba(0,0,0,0.2)',
           }}>
             {level.character.emoji}
           </div>
-          {/* Online dot */}
           <div style={{ position: 'absolute', bottom: 3, right: 3, width: 16, height: 16, borderRadius: '50%', background: '#22C55E', border: '3px solid white' }} />
         </div>
       </div>
 
       {/* Name tag */}
-      <div style={{ textAlign: 'center', marginTop: 8 }}>
-        <span style={{ background: sector.color, color: 'white', borderRadius: 12, padding: '5px 16px', fontSize: 13, fontWeight: 800, display: 'inline-block' }}>
+      <div style={{ textAlign: 'center', marginTop: 6, marginBottom: 4, flexShrink: 0 }}>
+        <span style={{ background: sector.color, color: 'white', borderRadius: 12, padding: '4px 14px', fontSize: 12, fontWeight: 800, display: 'inline-block', letterSpacing: 0.3 }}>
           {level.character.name} · {level.character.role}
         </span>
       </div>
 
       {/* ── IDLE: tap to listen ── */}
       {isIdle && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 20px', gap: 20 }}>
-          <div style={{ background: 'white', borderRadius: 22, padding: '16px 20px', maxWidth: 320, width: '100%', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', textAlign: 'center' }}>
-            <div style={{ fontSize: 13, color: '#AAA', fontWeight: 700, marginBottom: 8 }}>Get ready to listen</div>
-            <div style={{ fontSize: 40 }}>🎙️</div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '16px 20px 32px', gap: 18 }}>
+          <div style={{
+            background: 'white', borderRadius: 22, padding: '18px 24px',
+            maxWidth: 320, width: '100%',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+            textAlign: 'center',
+            border: `1.5px solid ${sector.color}22`,
+          }}>
+            <div style={{ fontSize: 13, color: '#BBB', fontWeight: 700, marginBottom: 10, letterSpacing: 0.5, textTransform: 'uppercase' }}>Ready?</div>
+            <div style={{ fontSize: 42, marginBottom: 8 }}>🎙️</div>
+            <div style={{ fontSize: 16, color: '#555', fontWeight: 600 }}>{level.character.name} will speak</div>
           </div>
           <button
             onClick={handleListenTap}
             style={{
-              width: 120, height: 120, borderRadius: '50%',
+              width: 110, height: 110, borderRadius: '50%',
               background: sector.gradient,
               border: `4px solid ${sector.dark}`,
-              color: 'white', fontSize: 50,
+              color: 'white', fontSize: 48,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', minHeight: 'unset', minWidth: 'unset',
-              boxShadow: `0 8px 32px ${sector.color}66`,
-              transition: 'transform 0.1s',
+              boxShadow: `0 8px 32px ${sector.color}55`,
             }}
             onMouseDown={e => e.currentTarget.style.transform = 'scale(0.92)'}
             onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
             onTouchStart={e => e.currentTarget.style.transform = 'scale(0.92)'}
             onTouchEnd={e => e.currentTarget.style.transform = 'scale(1)'}
           >👂</button>
-          <div style={{ fontSize: 26 }}>👆</div>
+          <div style={{ fontSize: 24 }}>👆</div>
         </div>
       )}
 
       {/* ── Speaking: wave animation ── */}
       {isCharSpeaking && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 20px', gap: 14 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 20px 8px', gap: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, height: 52 }}>
             {WAVE_H.map((h, i) => (
               <div key={i} className="wave-bar" style={{ height: h, background: sector.color, animationDelay: WAVE_D[i] }} />
@@ -583,22 +623,19 @@ Reply ONE warm sentence, max 12 words. Very simple English.`
         </div>
       )}
 
-      {/* ── Post-speak: speech bubble ── */}
+      {/* ── Post-speak: speech bubbles ── */}
       {!isIdle && !isCharSpeaking && (
-        <div style={{ padding: '16px 20px 0', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {/* Char bubble */}
+        <div style={{ padding: '8px 18px 0', display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ position: 'relative', maxWidth: 300 }}>
-            <div style={{ position: 'absolute', top: -10, left: 28, width: 0, height: 0, borderLeft: '10px solid transparent', borderRight: '10px solid transparent', borderBottom: '12px solid white' }} />
-            <div style={{ background: 'white', borderRadius: 18, padding: '14px 16px', boxShadow: '0 3px 16px rgba(0,0,0,0.09)' }}>
-              <div style={{ fontSize: 16, color: '#1A1A2E', lineHeight: 1.6 }}>{charResponse || level.opening}</div>
+            <div style={{ position: 'absolute', top: -9, left: 26, width: 0, height: 0, borderLeft: '9px solid transparent', borderRight: '9px solid transparent', borderBottom: '11px solid white' }} />
+            <div style={{ background: 'white', borderRadius: 18, padding: '12px 16px', boxShadow: '0 3px 14px rgba(0,0,0,0.08)' }}>
+              <div style={{ fontSize: 15, color: '#1A1A2E', lineHeight: 1.6 }}>{charResponse || level.opening}</div>
             </div>
           </div>
-
-          {/* Player bubble */}
           {playerSpeech && !isProcessing && (
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <div style={{ background: sector.gradient, borderRadius: 18, padding: '12px 16px', maxWidth: 260, boxShadow: `0 4px 14px ${sector.color}55` }}>
-                <div style={{ fontSize: 15, color: 'white', fontWeight: 600, lineHeight: 1.4 }}>{playerSpeech}</div>
+              <div style={{ background: sector.gradient, borderRadius: 18, padding: '10px 16px', maxWidth: 240, boxShadow: `0 4px 14px ${sector.color}44` }}>
+                <div style={{ fontSize: 14, color: 'white', fontWeight: 600, lineHeight: 1.4 }}>{playerSpeech}</div>
               </div>
             </div>
           )}
@@ -607,117 +644,143 @@ Reply ONE warm sentence, max 12 words. Very simple English.`
 
       {/* Processing */}
       {isProcessing && (
-        <div style={{ textAlign: 'center', padding: '16px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+        <div style={{ textAlign: 'center', padding: '14px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
           <div style={{ display: 'flex', gap: 8 }}>
             {[0,1,2].map(i => <div key={i} className="wave-bar" style={{ width: 10, height: 14, background: sector.color, animationDelay: `${i*0.2}s` }} />)}
           </div>
-          <div style={{ color: '#AAA', fontSize: 13 }}>Thinking…</div>
         </div>
       )}
 
-      <div style={{ flex: 1 }} />
+      {/* ── Retry screen (off-topic / bad input) ── */}
+      {isRetry && (
+        <div className="animate-slide-up" style={{
+          margin: '16px 18px 0',
+          background: 'white',
+          borderRadius: 24,
+          padding: '24px 20px',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+          textAlign: 'center',
+          border: '2px solid #FDE68A',
+        }}>
+          <div style={{ fontSize: 50, marginBottom: 14 }}>🙂</div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: '#92400E', marginBottom: 20, lineHeight: 1.4 }}>
+            {retryMsg || "Let's try again! Listen carefully."}
+          </div>
+          <div style={{ fontSize: 30, letterSpacing: 6, marginBottom: 18 }}>{level.hint}</div>
+          <button
+            onClick={resetToSpeak}
+            style={{
+              width: '100%',
+              background: sector.gradient,
+              color: 'white', fontSize: 20, fontWeight: 900,
+              borderRadius: 18, padding: '18px 0',
+              border: `3px solid ${sector.dark}`, cursor: 'pointer', minHeight: 'unset',
+              boxShadow: `0 6px 20px ${sector.color}55`,
+            }}
+          >🎤 Try Again</button>
+        </div>
+      )}
+
+      <div style={{ flex: 1, minHeight: 8 }} />
 
       {/* ── Coach panel ── */}
-      {showCoach && coaching && (
+      {isCoaching && coaching && (
         <div className="animate-slide-up" style={{
           background: 'white',
           borderRadius: '28px 28px 0 0',
-          padding: '6px 20px 40px',
-          boxShadow: '0 -8px 40px rgba(0,0,0,0.14)',
+          padding: '6px 18px 36px',
+          boxShadow: '0 -8px 40px rgba(0,0,0,0.13)',
+          flexShrink: 0,
         }}>
-          {/* Drag handle */}
-          <div style={{ width: 40, height: 4, background: '#E0E0E0', borderRadius: 2, margin: '12px auto 18px' }} />
+          <div style={{ width: 40, height: 4, background: '#E5E5E5', borderRadius: 2, margin: '10px auto 14px' }} />
 
           {/* Stars */}
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 10 }}>
             {[1,2,3].map(s => (
-              <span key={s} className={s <= stars ? `star-${s}` : ''} style={{ fontSize: 42, filter: s <= stars ? 'none' : 'grayscale(1)', opacity: s <= stars ? 1 : 0.18 }}>⭐</span>
+              <span key={s} className={s <= stars ? `star-${s}` : ''} style={{ fontSize: 38, filter: s <= stars ? 'none' : 'grayscale(1)', opacity: s <= stars ? 1 : 0.15 }}>⭐</span>
             ))}
           </div>
 
           {/* Encouragement */}
-          <div style={{ textAlign: 'center', fontSize: 18, fontWeight: 800, color: '#1A1A2E', marginBottom: 16, lineHeight: 1.3 }}>
+          <div style={{ textAlign: 'center', fontSize: 17, fontWeight: 800, color: '#1A1A2E', marginBottom: 12, lineHeight: 1.35 }}>
             {coaching.encouragement}
           </div>
 
-          {/* Better phrase card */}
-          <div style={{
-            background: 'linear-gradient(135deg, #F0FFF4, #DCFCE7)',
-            border: '2px solid #86EFAC',
-            borderRadius: 18, padding: '14px 18px', marginBottom: 12,
-            boxShadow: '0 2px 8px rgba(88,204,2,0.12)',
-          }}>
-            <div style={{ fontSize: 11, color: '#16A34A', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 8 }}>Try saying</div>
-            <div style={{ fontSize: 21, fontWeight: 900, color: '#14532D', lineHeight: 1.3 }}>{coaching.better_phrase}</div>
+          {/* Better phrase */}
+          <div style={{ background: 'linear-gradient(135deg, #F0FFF4, #DCFCE7)', border: '2px solid #86EFAC', borderRadius: 16, padding: '12px 16px', marginBottom: 10, boxShadow: '0 2px 8px rgba(88,204,2,0.1)' }}>
+            <div style={{ fontSize: 10, color: '#16A34A', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 6 }}>Try saying</div>
+            <div style={{ fontSize: 19, fontWeight: 900, color: '#14532D', lineHeight: 1.3 }}>{coaching.better_phrase}</div>
           </div>
 
-          {/* Bengali card */}
-          <div style={{
-            background: 'linear-gradient(135deg, #FFFBEB, #FEF3C7)',
-            border: '2px solid #FDE68A',
-            borderRadius: 18, padding: '12px 18px', marginBottom: 20,
-            boxShadow: '0 2px 8px rgba(251,191,36,0.12)',
-          }}>
-            <div style={{ fontSize: 11, color: '#92400E', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 6 }}>বাংলা</div>
-            <div style={{ fontSize: 16, color: '#78350F', lineHeight: 1.65 }}>{coaching.bengali_translation}</div>
+          {/* Bengali */}
+          <div style={{ background: 'linear-gradient(135deg, #FFFBEB, #FEF3C7)', border: '2px solid #FDE68A', borderRadius: 16, padding: '10px 16px', marginBottom: 14, boxShadow: '0 2px 8px rgba(251,191,36,0.1)' }}>
+            <div style={{ fontSize: 10, color: '#92400E', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 5 }}>বাংলা</div>
+            <div style={{ fontSize: 15, color: '#78350F', lineHeight: 1.65 }}>{coaching.bengali_translation}</div>
           </div>
 
-          {isCoaching && (
+          {/* Buttons: listen + continue side by side */}
+          <div style={{ display: 'flex', gap: 10 }}>
             <button
-              onClick={() => speak(coaching.better_phrase, { rate: 0.68, onEnd: () => setPhase('coaching_replay') })}
+              onClick={() => speak(coaching.better_phrase, { rate: 0.68 })}
               style={{
-                width: '100%', background: sector.gradient,
-                color: 'white', fontSize: 18, fontWeight: 900,
-                borderRadius: 18, padding: '18px 0',
-                border: `3px solid ${sector.dark}`, cursor: 'pointer', minHeight: 'unset',
-                boxShadow: `0 6px 20px ${sector.color}55`,
-                letterSpacing: -0.3,
+                flex: 1,
+                background: 'white',
+                border: `2.5px solid ${sector.color}`,
+                color: sector.color, fontSize: 22,
+                borderRadius: 16, padding: '16px 0',
+                cursor: 'pointer', minHeight: 'unset',
+                fontWeight: 900,
               }}
-            >🔊  Say it with me</button>
-          )}
-          {isReplay && (
+            >🔊</button>
             <button
               onClick={() => onComplete(stars)}
-              className="animate-bounce-in"
               style={{
-                width: '100%',
+                flex: 3,
                 background: 'linear-gradient(135deg, #22C55E, #16A34A)',
                 color: 'white', fontSize: 18, fontWeight: 900,
-                borderRadius: 18, padding: '18px 0',
+                borderRadius: 16, padding: '16px 0',
                 border: '3px solid #15803D', cursor: 'pointer', minHeight: 'unset',
-                boxShadow: '0 6px 20px rgba(34,197,94,0.5)',
+                boxShadow: '0 6px 20px rgba(34,197,94,0.45)',
               }}
-            >✓  Continue</button>
+            >✓ Continue</button>
+          </div>
+
+          {/* Retry option for 1-star */}
+          {stars === 1 && (
+            <button
+              onClick={resetToSpeak}
+              style={{ width: '100%', marginTop: 10, background: 'none', border: '2px solid #E5E5E5', color: '#888', fontSize: 15, fontWeight: 700, borderRadius: 14, padding: '12px 0', cursor: 'pointer', minHeight: 'unset' }}
+            >🔁 Try again</button>
           )}
         </div>
       )}
 
       {/* ── Mic area ── */}
       {(showMic || (isReadyToSpeak && showText)) && (
-        <div style={{ padding: '18px 20px 44px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+        <div style={{ padding: '14px 20px 40px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, flexShrink: 0 }}>
           {!showText ? (
             <>
-              <div style={{ fontSize: 34, letterSpacing: 8 }}>{level.hint}</div>
-              <div style={{ fontSize: 20 }}>{isRecording ? '🔴' : '👆'}</div>
+              <div style={{ fontSize: 32, letterSpacing: 8 }}>{level.hint}</div>
+              <div style={{ fontSize: 18 }}>{isRecording ? '🔴' : '👆'}</div>
               <button
                 className={isRecording ? 'animate-mic-glow' : ''}
                 onClick={toggleRecording}
                 style={{
-                  width: 100, height: 100, borderRadius: '50%',
+                  width: 96, height: 96, borderRadius: '50%',
                   background: isRecording ? 'linear-gradient(135deg, #FF4B4B, #CC0000)' : 'linear-gradient(135deg, #22C55E, #16A34A)',
                   border: `4px solid ${isRecording ? '#990000' : '#15803D'}`,
-                  color: 'white', fontSize: 42,
+                  color: 'white', fontSize: 40,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   cursor: 'pointer', minHeight: 'unset', minWidth: 'unset',
                   boxShadow: isRecording ? '0 6px 24px rgba(255,75,75,0.55)' : '0 6px 24px rgba(34,197,94,0.55)',
                   transition: 'all 0.2s',
                 }}
               >{isRecording ? '⏹' : '🎤'}</button>
-              <button onClick={() => setShowText(true)} style={{ background: 'none', border: 'none', color: '#CCC', fontSize: 30, cursor: 'pointer', minHeight: 'unset', minWidth: 'unset' }}>⌨️</button>
+              <button onClick={() => setShowText(true)} style={{ background: 'none', border: 'none', color: '#CCC', fontSize: 28, cursor: 'pointer', minHeight: 'unset', minWidth: 'unset' }}>⌨️</button>
             </>
           ) : (
             <div style={{ width: '100%', maxWidth: 340, display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ textAlign: 'center', fontSize: 34 }}>{level.hint}</div>
+              <div style={{ textAlign: 'center', fontSize: 32 }}>{level.hint}</div>
               <input
                 autoFocus value={textInput}
                 onChange={e => setTextInput(e.target.value)}
