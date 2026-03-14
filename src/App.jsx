@@ -305,7 +305,7 @@ function ConversationScreen({ sectorIdx, levelIdx, onComplete, onBack }) {
   const level    = sector.levels[levelIdx]
   const fallback = FALLBACKS[sectorIdx * 3 + levelIdx]
 
-  const [phase,        setPhase]        = useState('char_speaking')
+  const [phase,        setPhase]        = useState('idle')
   const [playerSpeech, setPlayerSpeech] = useState('')
   const [charResponse, setCharResponse] = useState('')
   const [coaching,     setCoaching]     = useState(null)
@@ -316,15 +316,9 @@ function ConversationScreen({ sectorIdx, levelIdx, onComplete, onBack }) {
   const recRef     = useRef(null)
   const timeoutRef = useRef(null)
   const gotResult  = useRef(false)
-
-  // Bug 3 fix: detect iOS — SpeechRecognition not supported there
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+  const isIOS      = /iPad|iPhone|iPod/.test(navigator.userAgent)
 
   useEffect(() => {
-    speak(level.opening, {
-      rate: level.character.rate, pitch: level.character.pitch,
-      onEnd: () => setPhase('ready_to_speak'),
-    })
     return () => {
       stopSpeech()
       clearTimeout(timeoutRef.current)
@@ -332,54 +326,45 @@ function ConversationScreen({ sectorIdx, levelIdx, onComplete, onBack }) {
     }
   }, [])
 
-  const startRecording = useCallback(() => {
+  // User taps big LISTEN button → character speaks
+  const handleListenTap = () => {
+    setPhase('char_speaking')
+    speak(level.opening, {
+      rate: level.character.rate, pitch: level.character.pitch,
+      onEnd: () => setPhase('ready_to_speak'),
+    })
+  }
+
+  // Tap-to-toggle mic
+  const toggleRecording = useCallback(() => {
+    if (phase === 'recording') {
+      clearTimeout(timeoutRef.current)
+      try { recRef.current?.stop() } catch (_) {}
+      return
+    }
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
-    // Bug 3 fix: iOS has no SpeechRecognition — go straight to text
     if (!SR || isIOS) { setShowText(true); return }
 
     gotResult.current = false
     const r = new SR()
     r.continuous = false; r.interimResults = false; r.lang = 'en-US'
-
     r.onresult = e => {
       gotResult.current = true
       clearTimeout(timeoutRef.current)
       handlePlayerSpeech(e.results[0][0].transcript)
     }
-
-    // Bug 2 fix: if onend fires without a result, user stayed silent → show text fallback
     r.onend = () => {
       clearTimeout(timeoutRef.current)
       if (!gotResult.current) setShowText(true)
     }
-
-    r.onerror = () => {
-      clearTimeout(timeoutRef.current)
-      setShowText(true)
-    }
-
+    r.onerror = () => { clearTimeout(timeoutRef.current); setShowText(true) }
     recRef.current = r
     r.start()
     setPhase('recording')
-
-    // Bug 2 fix: 10s hard timeout in case onend never fires
     timeoutRef.current = setTimeout(() => {
-      if (!gotResult.current) {
-        try { recRef.current?.stop() } catch (_) {}
-        setShowText(true)
-      }
+      if (!gotResult.current) { try { recRef.current?.stop() } catch (_) {} setShowText(true) }
     }, 10000)
-  }, [isIOS])
-
-  // Bug 1 fix: removed stopRecording from onMouseUp/onTouchEnd — mic is tap-to-toggle only
-  const toggleRecording = useCallback(() => {
-    if (phase === 'recording') {
-      clearTimeout(timeoutRef.current)
-      try { recRef.current?.stop() } catch (_) {}
-    } else {
-      startRecording()
-    }
-  }, [phase, startRecording])
+  }, [phase, isIOS])
 
   const handlePlayerSpeech = async (speech) => {
     setPlayerSpeech(speech); setPhase('processing')
@@ -407,16 +392,33 @@ Reply ONE warm sentence, max 12 words. Very simple English.`
         const raw = coachRes.content[0].text.trim().replace(/^```json\s*/i,'').replace(/^```\s*/i,'').replace(/```\s*$/g,'').trim()
         coachObj = JSON.parse(raw)
       } catch { coachObj = fallback }
-      setCharResponse(charRes.content?.[0]?.text?.trim() || 'Good. Keep going.')
+      const charText = charRes.content?.[0]?.text?.trim() || 'Good. Keep going.'
+      setCharResponse(charText)
       setCoaching(coachObj)
       setStars(Math.min(3, Math.max(1, coachObj.star_count ?? 2)))
       setPhase('coaching')
+      // Auto-read the coaching aloud: encouragement → better phrase → Bengali
+      speak(coachObj.encouragement || fallback.encouragement, {
+        rate: 0.85,
+        onEnd: () => speak(coachObj.better_phrase || fallback.better_phrase, {
+          rate: 0.78,
+          onEnd: () => speak(coachObj.bengali_translation || fallback.bengali_translation, { rate: 0.8, lang: 'bn-BD' })
+        })
+      })
     } catch {
       setCharResponse('Good. Keep going.')
       setCoaching(fallback); setStars(fallback.star_count); setPhase('coaching')
+      speak(fallback.encouragement, {
+        rate: 0.85,
+        onEnd: () => speak(fallback.better_phrase, {
+          rate: 0.78,
+          onEnd: () => speak(fallback.bengali_translation, { rate: 0.8, lang: 'bn-BD' })
+        })
+      })
     }
   }
 
+  const isIdle         = phase === 'idle'
   const isCharSpeaking = phase === 'char_speaking'
   const isReadyToSpeak = phase === 'ready_to_speak'
   const isRecording    = phase === 'recording'
@@ -437,58 +439,98 @@ Reply ONE warm sentence, max 12 words. Very simple English.`
         <div style={{ fontSize: 22 }}>{level.character.emoji}</div>
       </div>
 
-      {/* Character scene */}
-      <div style={{ padding: '32px 20px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-        {/* Avatar */}
-        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {isCharSpeaking && [0, 1].map(ri => (
-            <div key={ri} style={{
-              position: 'absolute', width: 100, height: 100, borderRadius: '50%',
-              border: `3px solid ${sector.color}`,
-              animation: `pulse-ring 1.5s ease-out ${ri * 0.6}s infinite`,
-              opacity: 0.6,
-            }} />
-          ))}
+      {/* ── IDLE: "meet your character" tap screen ── */}
+      {isIdle && (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', gap: 22 }}>
+          {/* Big avatar */}
           <div style={{
-            width: 90, height: 90, borderRadius: '50%',
-            background: sector.light, border: `4px solid ${sector.color}`,
+            width: 130, height: 130, borderRadius: '50%',
+            background: sector.light, border: `5px solid ${sector.color}`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 44, position: 'relative', zIndex: 1,
-            boxShadow: `0 6px 24px ${sector.color}44`,
+            fontSize: 64, boxShadow: `0 8px 32px ${sector.color}44`,
           }}>
             {level.character.emoji}
           </div>
-        </div>
 
-        {/* Name tag */}
-        <div style={{ background: sector.color, color: 'white', borderRadius: 12, padding: '4px 14px', fontSize: 13, fontWeight: 800 }}>
-          {level.character.name} · {level.character.role}
-        </div>
-
-        {/* Wave bars */}
-        {isCharSpeaking && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, height: 50 }}>
-            {WAVE_H.map((h, i) => (
-              <div key={i} className="wave-bar" style={{ height: h, background: sector.color, animationDelay: WAVE_D[i] }} />
-            ))}
+          {/* Name + role badge */}
+          <div style={{ background: sector.color, color: 'white', borderRadius: 14, padding: '8px 22px', fontSize: 16, fontWeight: 800 }}>
+            {level.character.name} · {level.character.role}
           </div>
-        )}
 
-        {/* Speech bubble — chat style */}
-        <div style={{ position: 'relative', maxWidth: 320, width: '100%' }}>
-          {/* Triangle */}
-          <div style={{ position: 'absolute', top: -12, left: 36, width: 0, height: 0, borderLeft: '12px solid transparent', borderRight: '12px solid transparent', borderBottom: '14px solid white' }} />
-          <div style={{
-            background: 'white', borderRadius: 20, padding: '16px 18px',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.10)',
-            border: '2px solid #E5E5E5',
-          }}>
-            <div style={{ fontSize: 17, color: '#222', lineHeight: 1.6, fontWeight: 500 }}>
-              {charResponse || level.opening}
+          {/* Giant ear / listen button */}
+          <button
+            onClick={handleListenTap}
+            style={{
+              width: 130, height: 130, borderRadius: '50%',
+              background: sector.color, border: `5px solid ${sector.dark}`,
+              color: 'white', fontSize: 60,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', minHeight: 'unset', minWidth: 'unset',
+              boxShadow: `0 10px 36px ${sector.color}66`,
+            }}
+            onMouseDown={e => e.currentTarget.style.transform = 'scale(0.93)'}
+            onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
+            onTouchStart={e => e.currentTarget.style.transform = 'scale(0.93)'}
+            onTouchEnd={e => { e.currentTarget.style.transform = 'scale(1)' }}
+          >
+            👂
+          </button>
+          {/* Purely visual "tap" cue */}
+          <div style={{ fontSize: 28 }}>👆</div>
+        </div>
+      )}
+
+      {/* ── SPEAKING / POST-SPEAK: avatar + bubble ── */}
+      {!isIdle && (
+        <div style={{ padding: '28px 20px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+          {/* Avatar with pulse rings when speaking */}
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {isCharSpeaking && [0, 1].map(ri => (
+              <div key={ri} style={{
+                position: 'absolute', width: 100, height: 100, borderRadius: '50%',
+                border: `3px solid ${sector.color}`,
+                animation: `pulse-ring 1.5s ease-out ${ri * 0.6}s infinite`,
+                opacity: 0.6,
+              }} />
+            ))}
+            <div style={{
+              width: 88, height: 88, borderRadius: '50%',
+              background: sector.light, border: `4px solid ${sector.color}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 42, position: 'relative', zIndex: 1,
+              boxShadow: `0 6px 24px ${sector.color}44`,
+            }}>
+              {level.character.emoji}
             </div>
           </div>
+
+          {/* Name tag */}
+          <div style={{ background: sector.color, color: 'white', borderRadius: 12, padding: '4px 14px', fontSize: 13, fontWeight: 800 }}>
+            {level.character.name} · {level.character.role}
+          </div>
+
+          {/* Wave bars while speaking */}
+          {isCharSpeaking && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, height: 48 }}>
+              {WAVE_H.map((h, i) => (
+                <div key={i} className="wave-bar" style={{ height: h, background: sector.color, animationDelay: WAVE_D[i] }} />
+              ))}
+            </div>
+          )}
+
+          {/* Speech bubble (shown after TTS ends) */}
+          {!isCharSpeaking && (
+            <div style={{ position: 'relative', maxWidth: 320, width: '100%' }}>
+              <div style={{ position: 'absolute', top: -12, left: 36, width: 0, height: 0, borderLeft: '12px solid transparent', borderRight: '12px solid transparent', borderBottom: '14px solid white' }} />
+              <div style={{ background: 'white', borderRadius: 20, padding: '16px 18px', boxShadow: '0 4px 20px rgba(0,0,0,0.10)', border: '2px solid #E5E5E5' }}>
+                <div style={{ fontSize: 17, color: '#222', lineHeight: 1.6, fontWeight: 500 }}>
+                  {charResponse || level.opening}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
       {/* Player bubble */}
       {playerSpeech && !isCharSpeaking && !isReadyToSpeak && (
@@ -580,10 +622,9 @@ Reply ONE warm sentence, max 12 words. Very simple English.`
         <div style={{ padding: '20px 20px 48px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
           {!showText ? (
             <>
-              <div style={{ fontSize: 13, color: '#999', fontWeight: 700 }}>
-                {isRecording ? '🔴  Listening…' : 'Your turn — tap to speak'}
-              </div>
+              {/* Icon-only prompt — no English text */}
               <div style={{ fontSize: 36, letterSpacing: 10 }}>{level.hint}</div>
+              <div style={{ fontSize: 22 }}>{isRecording ? '🔴' : '👆'}</div>
 
               {/* Mic — tap once to start, tap again to stop */}
               <button
@@ -605,8 +646,8 @@ Reply ONE warm sentence, max 12 words. Very simple English.`
 
               <button
                 onClick={() => setShowText(true)}
-                style={{ background: 'none', border: 'none', color: '#BBBBBB', fontSize: 14, cursor: 'pointer', minHeight: 'unset', textDecoration: 'underline' }}
-              >⌨️ type instead</button>
+                style={{ background: 'none', border: 'none', color: '#CCCCCC', fontSize: 32, cursor: 'pointer', minHeight: 'unset', minWidth: 'unset', padding: 0 }}
+              >⌨️</button>
             </>
           ) : (
             <div style={{ width: '100%', maxWidth: 340, display: 'flex', flexDirection: 'column', gap: 12 }}>
