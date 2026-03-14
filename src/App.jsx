@@ -3,6 +3,12 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import imgCleanRoom    from './assets/clean_room.jpg.webp'
 import imgGarbage      from './assets/take_garbage_out.webp'
 import imgComplaint    from './assets/hotel_user_complaint.jpg'
+import imgPackBoxes    from './assets/pack_boxes.jpg'
+import imgPackLine     from './assets/packaging_line.jpeg'
+import imgThumbsUp     from './assets/thumbs_up.jpg'
+import imgWatering     from './assets/someone_watering.jpg'
+import imgDamaged      from './assets/damaged_plants.jpeg'
+import imgBreak        from './assets/break_time.jpg'
 
 const API_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY
 
@@ -14,9 +20,9 @@ const SECTORS = [
     id: 'pack', emoji: '📦', label: 'Packaging',
     color: '#1CB0F6', dark: '#0095D9', light: '#E8F7FF',
     levels: [
-      { name: 'First Day', character: { name: 'Dan', role: 'Supervisor', emoji: '👷', rate: 0.82, pitch: 0.95 }, opening: 'Good morning. Today you will pack boxes on line three. Watch me first.', targetPhrase: 'Yes. I will watch you.', hint: '✅  👀', description: 'Supervisor gives first-day instructions' },
-      { name: 'Go Faster', character: { name: 'Maria', role: 'Line Lead', emoji: '👩‍🏭', rate: 0.88, pitch: 1.08 }, opening: 'The line is slow today. We need to go faster. Can you keep up?', targetPhrase: 'Yes. I will try to go faster.', hint: '🏃  ⬆️', description: 'Line lead asks for more speed' },
-      { name: 'End of Shift', character: { name: 'Dan', role: 'Supervisor', emoji: '👷', rate: 0.82, pitch: 0.95 }, opening: 'Good work today. You did a great job. See you tomorrow.', targetPhrase: 'Thank you. See you tomorrow.', hint: '🙏  👋', description: 'Wrapping up the first shift' },
+      { name: 'First Day',   image: imgPackBoxes, character: { name: 'Dan', role: 'Supervisor', emoji: '👷', rate: 0.82, pitch: 0.95 }, opening: 'Good morning. Today you will pack boxes on line three. Watch me first.', targetPhrase: 'Yes. I will watch you.', hint: '✅  👀', description: 'Supervisor gives first-day instructions' },
+      { name: 'Go Faster',   image: imgPackLine,  character: { name: 'Maria', role: 'Line Lead', emoji: '👩‍🏭', rate: 0.88, pitch: 1.08 }, opening: 'The line is slow today. We need to go faster. Can you keep up?', targetPhrase: 'Yes. I will try to go faster.', hint: '🏃  ⬆️', description: 'Line lead asks for more speed' },
+      { name: 'End of Shift', image: imgThumbsUp, character: { name: 'Dan', role: 'Supervisor', emoji: '👷', rate: 0.82, pitch: 0.95 }, opening: 'Good work today. You did a great job. See you tomorrow.', targetPhrase: 'Thank you. See you tomorrow.', hint: '🙏  👋', description: 'Wrapping up the first shift' },
     ],
   },
   {
@@ -32,9 +38,9 @@ const SECTORS = [
     id: 'green', emoji: '🌿', label: 'Greenhouse',
     color: '#FF9600', dark: '#E07800', light: '#FFF4E0',
     levels: [
-      { name: 'Watering Rules', character: { name: 'Carlos', role: 'Trainer', emoji: '🧑‍🌾', rate: 0.82, pitch: 1.0 }, opening: 'Today you will water section B. Use the green hose only. Do not water the red tags.', targetPhrase: 'OK. Section B, green hose, no red tags.', hint: '💚  🚫', description: 'Trainer explains watering rules' },
-      { name: 'Damaged Plants', character: { name: 'Sarah', role: 'Supervisor', emoji: '👩‍🔬', rate: 0.84, pitch: 1.05 }, opening: 'Some of these plants look damaged. Did you notice this before?', targetPhrase: 'No. I am sorry. I will tell you next time.', hint: '😔  📢', description: 'Supervisor asks about damaged plants' },
-      { name: 'Break Bell', character: { name: 'Carlos', role: 'Trainer', emoji: '🧑‍🌾', rate: 0.85, pitch: 1.0 }, opening: 'The bell rang. It is break time. Come on, let us go eat.', targetPhrase: 'OK. Thank you. I am coming.', hint: '🔔  🍽️', description: 'Break time — follow the team' },
+      { name: 'Watering Rules', image: imgWatering, character: { name: 'Carlos', role: 'Trainer', emoji: '🧑‍🌾', rate: 0.82, pitch: 1.0 }, opening: 'Today you will water section B. Use the green hose only. Do not water the red tags.', targetPhrase: 'OK. Section B, green hose, no red tags.', hint: '💚  🚫', description: 'Trainer explains watering rules' },
+      { name: 'Damaged Plants', image: imgDamaged, character: { name: 'Sarah', role: 'Supervisor', emoji: '👩‍🔬', rate: 0.84, pitch: 1.05 }, opening: 'Some of these plants look damaged. Did you notice this before?', targetPhrase: 'No. I am sorry. I will tell you next time.', hint: '😔  📢', description: 'Supervisor asks about damaged plants' },
+      { name: 'Break Bell',     image: imgBreak,   character: { name: 'Carlos', role: 'Trainer', emoji: '🧑‍🌾', rate: 0.85, pitch: 1.0 }, opening: 'The bell rang. It is break time. Come on, let us go eat.', targetPhrase: 'OK. Thank you. I am coming.', hint: '🔔  🍽️', description: 'Break time — follow the team' },
     ],
   },
   {
