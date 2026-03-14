@@ -158,9 +158,10 @@ function Confetti() {
   )
 }
 
+
 /* ─────────────────────────────────────────────────────────────────
    HOME SCREEN
-───────────────────────────────────────────────────────────────── */
+─────────────────────────────────────────────────────────────────── */
 function HomeScreen({ completedLevels, onSelect }) {
   useEffect(() => {
     speak('Hello. Tap a job to practice.', { rate: 0.8 })
@@ -172,117 +173,106 @@ function HomeScreen({ completedLevels, onSelect }) {
   const pct = Math.round((totalDone / totalLevels) * 100)
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F0F4F8', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', background: '#0F172A', display: 'flex', flexDirection: 'column' }}>
 
       {/* ── Hero header ── */}
       <div style={{
-        background: 'linear-gradient(135deg, #1E3A8A 0%, #1E40AF 60%, #2563EB 100%)',
-        padding: '28px 22px 36px',
+        background: 'linear-gradient(160deg, #1E3A8A 0%, #1D4ED8 50%, #2563EB 100%)',
+        padding: '52px 22px 28px',
+        position: 'relative',
+        overflow: 'hidden',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 22 }}>
+        {/* decorative blobs */}
+        <div style={{ position: 'absolute', top: -40, right: -40, width: 180, height: 180, borderRadius: '50%', background: 'rgba(99,179,237,0.12)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: -20, left: -20, width: 120, height: 120, borderRadius: '50%', background: 'rgba(167,139,250,0.1)', pointerEvents: 'none' }} />
+
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, position: 'relative' }}>
           <div>
-            <div style={{ color: '#93C5FD', fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 4 }}>Welcome back</div>
-            <div style={{ color: 'white', fontSize: 26, fontWeight: 900, letterSpacing: -0.5 }}>First Shift 🏭</div>
+            <div style={{ color: '#93C5FD', fontSize: 12, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 6 }}>First Shift</div>
+            <div style={{ color: 'white', fontSize: 28, fontWeight: 900, letterSpacing: -0.5, lineHeight: 1.1 }}>Learn English<br/>for Work 💼</div>
           </div>
-          {/* Stars badge */}
-          <div style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)', border: '1.5px solid rgba(255,255,255,0.25)', borderRadius: 18, padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 7 }}>
-            <span style={{ fontSize: 20 }}>⭐</span>
-            <span style={{ color: 'white', fontWeight: 900, fontSize: 18 }}>{totalDone}</span>
-            <span style={{ color: '#93C5FD', fontSize: 13, fontWeight: 600 }}>/ {totalLevels}</span>
+          <div style={{
+            background: 'rgba(255,255,255,0.12)',
+            backdropFilter: 'blur(12px)',
+            border: '1.5px solid rgba(255,255,255,0.2)',
+            borderRadius: 20, padding: '10px 16px',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+          }}>
+            <span style={{ fontSize: 22 }}>⭐</span>
+            <span style={{ color: 'white', fontWeight: 900, fontSize: 20, lineHeight: 1 }}>{totalDone}</span>
+            <span style={{ color: '#93C5FD', fontSize: 11, fontWeight: 600 }}>of {totalLevels}</span>
           </div>
         </div>
 
         {/* Progress bar */}
-        <div style={{ background: 'rgba(255,255,255,0.15)', borderRadius: 99, height: 10, overflow: 'hidden' }}>
+        <div style={{ background: 'rgba(255,255,255,0.12)', borderRadius: 99, height: 8, overflow: 'hidden' }}>
           <div style={{
             height: '100%', borderRadius: 99,
             background: 'linear-gradient(90deg, #34D399, #10B981)',
-            width: `${pct}%`, transition: 'width 1s ease',
-            boxShadow: '0 0 10px rgba(52,211,153,0.7)',
+            width: `${Math.max(pct, 3)}%`, transition: 'width 1s ease',
+            boxShadow: '0 0 12px rgba(52,211,153,0.8)',
           }} />
         </div>
-        <div style={{ color: '#93C5FD', fontSize: 12, fontWeight: 600, marginTop: 6 }}>{pct}% complete</div>
+        <div style={{ color: '#6EE7B7', fontSize: 12, fontWeight: 700, marginTop: 6 }}>{pct}% complete</div>
       </div>
 
-      {/* ── Sector cards ── */}
-      <div style={{ flex: 1, padding: '20px 16px 32px', display: 'flex', flexDirection: 'column', gap: 14, marginTop: -12 }}>
+      {/* ── 2-column sector grid ── */}
+      <div style={{ flex: 1, padding: '16px 14px 32px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         {SECTORS.map((sector, i) => {
-          const done  = completedLevels[i]?.size ?? 0
-          const total = sector.levels.length
+          const done    = completedLevels[i]?.size ?? 0
+          const total   = sector.levels.length
           const allDone = done === total
+          const bgImg   = sector.levels.find(l => l.image)?.image
 
           return (
             <button
               key={sector.id}
               onClick={() => onSelect(i)}
               style={{
-                background: 'white',
-                borderRadius: 22,
-                padding: 0,
-                overflow: 'hidden',
-                display: 'flex',
-                border: 'none',
-                cursor: 'pointer',
+                borderRadius: 20, overflow: 'hidden',
+                position: 'relative', border: 'none',
+                cursor: 'pointer', padding: 0,
+                aspectRatio: '3 / 4',
                 boxShadow: allDone
-                  ? `0 4px 20px ${sector.color}40`
-                  : '0 2px 12px rgba(0,0,0,0.08)',
-                transition: 'transform 0.15s, box-shadow 0.15s',
-                textAlign: 'left',
+                  ? `0 8px 28px ${sector.color}55`
+                  : '0 4px 18px rgba(0,0,0,0.35)',
+                transition: 'transform 0.13s',
               }}
-              onMouseDown={e => { e.currentTarget.style.transform = 'scale(0.97)'; e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.1)' }}
-              onMouseUp={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = allDone ? `0 4px 20px ${sector.color}40` : '0 2px 12px rgba(0,0,0,0.08)' }}
-              onTouchStart={e => { e.currentTarget.style.transform = 'scale(0.97)' }}
-              onTouchEnd={e => { e.currentTarget.style.transform = 'scale(1)' }}
+              onMouseDown={e => e.currentTarget.style.transform = 'scale(0.95)'}
+              onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
+              onTouchStart={e => e.currentTarget.style.transform = 'scale(0.95)'}
+              onTouchEnd={e => e.currentTarget.style.transform = 'scale(1)'}
             >
-              {/* Left color bar */}
-              <div style={{ width: 6, background: sector.gradient, flexShrink: 0 }} />
+              {/* Background image or gradient */}
+              {bgImg
+                ? <img src={bgImg} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                : <div style={{ position: 'absolute', inset: 0, background: sector.gradient }} />
+              }
 
-              {/* Content */}
-              <div style={{ flex: 1, padding: '18px 16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                  {/* Icon circle */}
-                  <div style={{
-                    width: 52, height: 52, borderRadius: 16,
-                    background: sector.light,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 26, flexShrink: 0,
-                    border: `2px solid ${sector.color}33`,
-                  }}>
-                    {sector.emoji}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 17, fontWeight: 900, color: '#1A1A2E', letterSpacing: -0.3 }}>{sector.label}</div>
-                    <div style={{ fontSize: 12, color: '#999', fontWeight: 600, marginTop: 2 }}>{total} lessons</div>
-                  </div>
-                  {allDone && <span style={{ fontSize: 22 }}>✅</span>}
-                </div>
+              {/* Gradient overlay bottom-heavy */}
+              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.05) 100%)' }} />
 
-                {/* Level dots */}
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  {sector.levels.map((lv, li) => {
-                    const lvDone = completedLevels[i]?.has(li)
-                    return (
-                      <div key={li} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <div style={{
-                          width: 32, height: 32, borderRadius: 10,
-                          background: lvDone ? sector.gradient : '#F0F0F0',
-                          border: `2px solid ${lvDone ? sector.dark : '#E0E0E0'}`,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: lvDone ? 14 : 12, fontWeight: 900,
-                          color: lvDone ? 'white' : '#BBB',
-                          boxShadow: lvDone ? `0 2px 8px ${sector.color}55` : 'none',
-                        }}>
-                          {lvDone ? '✓' : li + 1}
-                        </div>
-                        {li < total - 1 && <div style={{ width: 14, height: 2, background: lvDone && completedLevels[i]?.has(li + 1) ? sector.color : '#E5E5E5', borderRadius: 2 }} />}
-                      </div>
-                    )
-                  })}
+              {/* Completed ribbon */}
+              {allDone && (
+                <div style={{ position: 'absolute', top: 10, right: 10, background: '#22C55E', borderRadius: 10, padding: '4px 8px', fontSize: 12, fontWeight: 900, color: 'white' }}>✓</div>
+              )}
+
+              {/* Bottom content */}
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '14px 12px 16px' }}>
+                <div style={{ fontSize: 28, marginBottom: 4 }}>{sector.emoji}</div>
+                <div style={{ color: 'white', fontSize: 14, fontWeight: 900, letterSpacing: -0.2, marginBottom: 8, lineHeight: 1.2 }}>{sector.label}</div>
+                {/* Progress dots */}
+                <div style={{ display: 'flex', gap: 5 }}>
+                  {sector.levels.map((_, li) => (
+                    <div key={li} style={{
+                      width: completedLevels[i]?.has(li) ? 18 : 8,
+                      height: 8, borderRadius: 4,
+                      background: completedLevels[i]?.has(li) ? '#22C55E' : 'rgba(255,255,255,0.35)',
+                      transition: 'width 0.3s',
+                    }} />
+                  ))}
                 </div>
               </div>
-
-              {/* Right arrow */}
-              <div style={{ display: 'flex', alignItems: 'center', paddingRight: 16, color: '#CCC', fontSize: 22, fontWeight: 300 }}>›</div>
             </button>
           )
         })}
@@ -293,7 +283,7 @@ function HomeScreen({ completedLevels, onSelect }) {
 
 /* ─────────────────────────────────────────────────────────────────
    LEVEL SELECT
-───────────────────────────────────────────────────────────────── */
+─────────────────────────────────────────────────────────────────── */
 function LevelSelectScreen({ sectorIdx, completedLevels, onSelect, onBack }) {
   const sector = SECTORS[sectorIdx]
 
@@ -303,24 +293,30 @@ function LevelSelectScreen({ sectorIdx, completedLevels, onSelect, onBack }) {
   }, [])
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F0F4F8', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', background: '#0F172A', display: 'flex', flexDirection: 'column' }}>
+
       {/* Header */}
       <div style={{
         background: sector.gradient,
-        padding: '22px 20px 28px',
+        padding: '52px 20px 24px',
         display: 'flex', alignItems: 'center', gap: 14,
+        position: 'relative',
       }}>
         <button
           onClick={onBack}
-          style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 12, width: 42, height: 42, fontSize: 20, cursor: 'pointer', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 'unset' }}
+          style={{ background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(8px)', border: 'none', borderRadius: 12, width: 42, height: 42, fontSize: 20, cursor: 'pointer', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 'unset', flexShrink: 0 }}
         >←</button>
-        <div style={{ width: 46, height: 46, borderRadius: 14, background: 'rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>
+        <div style={{ width: 50, height: 50, borderRadius: 16, background: 'rgba(255,255,255,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, flexShrink: 0 }}>
           {sector.emoji}
         </div>
-        <span style={{ color: 'white', fontSize: 22, fontWeight: 900, letterSpacing: -0.5 }}>{sector.label}</span>
+        <div>
+          <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 2 }}>Choose a lesson</div>
+          <div style={{ color: 'white', fontSize: 22, fontWeight: 900, letterSpacing: -0.4 }}>{sector.label}</div>
+        </div>
       </div>
 
-      <div style={{ flex: 1, padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 14, marginTop: -8 }}>
+      {/* Level cards — full width images */}
+      <div style={{ flex: 1, padding: '16px 14px 32px', display: 'flex', flexDirection: 'column', gap: 14 }}>
         {sector.levels.map((level, i) => {
           const done = completedLevels[sectorIdx]?.has(i)
           return (
@@ -328,14 +324,13 @@ function LevelSelectScreen({ sectorIdx, completedLevels, onSelect, onBack }) {
               key={i}
               onClick={() => onSelect(i)}
               style={{
-                background: 'white',
-                border: `2px solid ${done ? sector.color : 'transparent'}`,
-                borderRadius: 22, padding: 0,
-                overflow: 'hidden',
-                display: 'flex', alignItems: 'stretch',
-                cursor: 'pointer', textAlign: 'left',
-                boxShadow: done ? `0 4px 16px ${sector.color}33` : '0 2px 10px rgba(0,0,0,0.07)',
+                borderRadius: 20, overflow: 'hidden',
+                position: 'relative', border: 'none', padding: 0,
+                height: 160, cursor: 'pointer',
+                boxShadow: done ? `0 6px 24px ${sector.color}44` : '0 4px 16px rgba(0,0,0,0.3)',
                 transition: 'transform 0.12s',
+                outline: done ? `3px solid ${sector.color}` : 'none',
+                outlineOffset: done ? 2 : 0,
                 minHeight: 'unset',
               }}
               onMouseDown={e => e.currentTarget.style.transform = 'scale(0.98)'}
@@ -343,30 +338,41 @@ function LevelSelectScreen({ sectorIdx, completedLevels, onSelect, onBack }) {
               onTouchStart={e => e.currentTarget.style.transform = 'scale(0.98)'}
               onTouchEnd={e => e.currentTarget.style.transform = 'scale(1)'}
             >
-              {/* Thumbnail */}
-              <div style={{ width: 90, height: 90, flexShrink: 0, position: 'relative', overflow: 'hidden' }}>
-                {level.image
-                  ? <img src={level.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', filter: done ? 'none' : 'brightness(0.85)' }} />
-                  : <div style={{ width: '100%', height: '100%', background: sector.light, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36 }}>{sector.emoji}</div>
-                }
-                {done && (
-                  <div style={{ position: 'absolute', inset: 0, background: `${sector.color}99`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30 }}>⭐</div>
-                )}
-                {!done && (
-                  <div style={{ position: 'absolute', bottom: 6, left: 6, background: sector.color, color: 'white', borderRadius: 8, width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 900 }}>
-                    {i + 1}
+              {/* Image or gradient fill */}
+              {level.image
+                ? <img src={level.image} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }} />
+                : <div style={{ position: 'absolute', inset: 0, background: sector.gradient, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ fontSize: 72, filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.3))' }}>{sector.emoji}</span>
                   </div>
-                )}
+              }
+
+              {/* Dark overlay */}
+              <div style={{ position: 'absolute', inset: 0, background: done
+                ? `linear-gradient(to top, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.2) 70%)`
+                : `linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.15) 70%)` }} />
+
+              {/* Number badge */}
+              <div style={{
+                position: 'absolute', top: 12, left: 12,
+                width: 30, height: 30, borderRadius: 10,
+                background: done ? '#22C55E' : sector.color,
+                color: 'white', fontWeight: 900, fontSize: 14,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: `0 2px 10px rgba(0,0,0,0.3)`,
+              }}>
+                {done ? '✓' : i + 1}
               </div>
 
-              {/* Text */}
-              <div style={{ flex: 1, padding: '14px 14px 14px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <div style={{ fontSize: 17, fontWeight: 900, color: '#1A1A2E', marginBottom: 4, letterSpacing: -0.2 }}>{level.name}</div>
-                <div style={{ fontSize: 13, color: '#888', lineHeight: 1.4 }}>{level.description}</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
-                  <div style={{ fontSize: 18 }}>{level.character.emoji}</div>
-                  <div style={{ fontSize: 12, color: '#AAA', fontWeight: 600 }}>{level.character.name} · {level.character.role}</div>
+              {/* Star if done */}
+              {done && <div style={{ position: 'absolute', top: 12, right: 12, fontSize: 24 }}>⭐</div>}
+
+              {/* Bottom text */}
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '12px 14px 14px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ color: 'white', fontSize: 17, fontWeight: 900, letterSpacing: -0.3, marginBottom: 3 }}>{level.name}</div>
+                  <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: 12, fontWeight: 600 }}>{level.character.emoji} {level.character.name} · {level.character.role}</div>
                 </div>
+                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 26, fontWeight: 300, lineHeight: 1 }}>›</div>
               </div>
             </button>
           )
@@ -375,6 +381,7 @@ function LevelSelectScreen({ sectorIdx, completedLevels, onSelect, onBack }) {
     </div>
   )
 }
+
 
 /* ─────────────────────────────────────────────────────────────────
    CONVERSATION SCREEN
