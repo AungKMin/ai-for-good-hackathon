@@ -12,11 +12,12 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* ── Keyframe animations (Tailwind can't express these) ── */
+/* ── Keyframe animations ── */
 @keyframes pulse-ring {
   0%   { transform: scale(1);   opacity: 0.7; }
   100% { transform: scale(2.4); opacity: 0;   }
 }
+.pulse-ring { animation: pulse-ring 1.5s ease-out infinite; }
 @keyframes wave-bar {
   0%, 100% { transform: scaleY(0.35); }
   50%       { transform: scaleY(1.6); }
